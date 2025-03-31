@@ -1,0 +1,4 @@
+savePath="C:\Users\Samuel Mason\Documents\KAN"
+filename=kan.bin
+inputPath=Data Sets\dataset.csv
+topology=0
