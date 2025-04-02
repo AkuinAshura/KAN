@@ -1,5 +1,3 @@
 class spline
 {
-public:
-    spline();
 };
