@@ -1,4 +1,4 @@
 filename=kan.bin
-saveLocation="C:\\Users\Samuel Mason\Documents\KAN"
-datasetLocation=Data Sets\dataset.csv
 layers=[2, 1, 1]
+datasetLocation=Data Sets\dataset.csv
+saveLocation=C:\Users\Samuel Mason\Documents\KAN

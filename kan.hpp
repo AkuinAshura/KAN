@@ -45,7 +45,7 @@ private:
     void retrieveAndSetDefaultHyperparameters(fs::path const &path);
     void initialiseNetwork();
     std::vector<Integer> layerWidths;
-    HyperParameterList hyperparameterList{};
+    HyperParameterList hyperparameterList{{"filename", ""}, {"saveLocation", ""}, {"datasetLocation", ""}, {"layers", ""}};
 };
 
 // template <typename... Args>

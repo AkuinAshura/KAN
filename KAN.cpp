@@ -11,16 +11,18 @@ KAN::KAN(fs::path const &path)
 class InvalidHyperparameterException : public std::exception
 {
 public:
-    InvalidHyperparameterException(std::string hyperparam, std::string value) {
+    InvalidHyperparameterException(std::string hyperparam, std::string value)
+    {
         m_hyperparam = hyperparam;
         m_value = value;
     }
-    std::string getErrorHyperparam() const { return m_hyperparam; }
-    std::string getErrorValue() const { return m_value; }
+    std::string getHyperparam() { return m_hyperparam; }
+    std::string getValue() { return m_value; }
     virtual const char *what() const noexcept
     {
-        return "Not in the list of allowed hyperparameters for this network. ";
+        return "not in the list of allowed hyperparameters for this network. ";
     }
+
 private:
     std::string m_hyperparam;
     std::string m_value;
@@ -29,35 +31,76 @@ private:
 class MissingHyperparameterException : public std::exception
 {
 public:
+    MissingHyperparameterException(HyperParameterList allowedHyperparams)
+    {
+        m_allowedHyperparams = allowedHyperparams;
+    }
+    HyperParameterList getAllowedHyperparams() { return m_allowedHyperparams; }
     virtual const char *what() const noexcept
     {
-        return "One or more hyperparameters is missing from the config file. ";
+        return "one or more hyperparameters is missing from the config file ";
     }
+
+private:
+    HyperParameterList m_allowedHyperparams;
 };
 
-// template<typename T>
-// auto convert(T&& t) {
-//     if constexpr (std::is_same<std::remove_cv_t<std::remove_reference_t<T>>, std::string>::value) {
+class FileException : public std::exception
+{
+public:
+    FileException(fs::path const &path)
+    {
+        m_path = path;
+    }
+    fs::path getPath() { return m_path; }
+    virtual const char *what() const noexcept
+    {
+        return "failed to open file ";
+    }
+
+private:
+    fs::path m_path;
+};
+
+std::string removeCarriageReturn(std::string str)
+{
+    if (!str.empty() && str[str.size() - 1] == '\r')
+    {
+        return str.erase(str.size() - 1);
+    }
+    return str;
+}
+
+// template <typename T>
+// auto convert(T &&t)
+// {
+//     if constexpr (std::is_same<std::remove_cv_t<std::remove_reference_t<T>>, std::string>::value)
+//     {
 //         return std::forward<T>(t).c_str();
-//     } else {
+//     }
+//     else
+//     {
 //         return std::forward<T>(t);
 //     }
 // }
 
-// template<typename ... Args>
-// std::string formatStringInternal(const std::string &format, Args ... args) {
-//     int size_s = std::snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for NULL terminator.
-//     if (size_s <= 0) {
+// template <typename... Args>
+// std::string formatStringInternal(const std::string &format, Args... args)
+// {
+//     int size_s = std::snprintf(nullptr, 0, format.c_str(), args...) + 1; // Extra space for NULL terminator.
+//     if (size_s <= 0)
+//     {
 //         throw std::runtime_error("Error during formatting.");
 //     }
 //     auto size = static_cast<size_t>(size_s); // Cast to signed type if error not thrown (snprintf returns negative if error occured).
 //     auto buf = std::make_unique<char[]>(size);
-//     std::snprintf(buf.get(), size, format.c_str(), args ...);
+//     std::snprintf(buf.get(), size, format.c_str(), args...);
 //     return std::string(buf.get(), buf.get() + size - 1); // Without NULL terminator.
 // }
 
-// template<typename ... Args>
-// std::string formatString(std::string fmt, Args&& ... args) {
+// template <typename... Args>
+// std::string formatString(std::string fmt, Args &&... args)
+// {
 //     return formatStringInternal(fmt, convert(std::forward<Args>(args))...);
 // }
 
@@ -66,11 +109,9 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
 {
     std::string hyperparam;
     std::string value;
-    std::string test = "test";
+    std::ifstream file(path);
     try
     {
-        std::ifstream file(path);
-        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         if (file.is_open())
         {
             std::string line;
@@ -82,39 +123,53 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
 
             while (std::getline(file, line))
             {
+                line = removeCarriageReturn(line); // On Windows, need to remove hidden \r from end of line.
                 pos = line.find(delim);
                 hyperparam = line.substr(0, pos);
-                hyperparams.insert(std::pair<std::string, std::string> (hyperparam, value));
                 value = line.substr(pos + 1);
-                //std::cout << formatString(" %s %s ", hyperparam, value) << std::endl;
+                hyperparams.insert(std::pair<std::string, std::string>(hyperparam, value));
                 if (auto findit = allowedHyperparams.find(hyperparam); findit != allowedHyperparams.end())
                 {
                     allowedHyperparams.erase(hyperparam); // Remove from the set of allowed hyperparameters for error checking later.
                 }
-                else
+                else if (hyperparam != "") // If empty we don't want to throw the following exception, just keep going.
                 {
                     throw InvalidHyperparameterException(hyperparam, value);
                 }
             }
             if (!allowedHyperparams.empty())
             {
-                throw MissingHyperparameterException();
+                throw MissingHyperparameterException(allowedHyperparams);
             }
             this->hyperparameterList = hyperparams;
         }
+        else
+        {
+            throw FileException(path);
+        }
     }
-    catch (std::ifstream::failure const &ex)
+    catch (FileException &ex)
     {
-        std::cerr << "Failed to read in hyperparameter values from " << path << std::endl;
+        std::cerr << "Error: " << ex.what() << ex.getPath();
     }
     catch (InvalidHyperparameterException &ex)
     {
-        std::cerr << ex.getErrorHyperparam() << ex.getErrorValue() << ex.what();
-        
+        std::cerr << "Error: hyperparameter [" << ex.getHyperparam() << "] with value [" << ex.getValue() << "] " << ex.what();
     }
     catch (MissingHyperparameterException &ex)
     {
-        std::cerr << "Error: " << ex.what() << std::endl;
+        std::cerr << "Error: " << ex.what() << "(";
+        bool first = true;
+        for (auto &pair : ex.getAllowedHyperparams())
+        {
+            if (!first)
+            {
+                std::cerr << ", ";
+            }
+            std::cerr << pair.first;
+            first = false; // Done this way to prevent printing an additional comma.
+        }
+        std::cerr << ")";
     }
 }
 
@@ -158,5 +213,5 @@ int main(void)
     // }
     while (1)
         ;
-        return 0;
+    return 0;
 }
