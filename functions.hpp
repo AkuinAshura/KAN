@@ -1,7 +1,11 @@
 #include <vector>
 
-// typedef double Scalar;
-// typedef int Integer;
-// typedef std::vector<Scalar> layer;
+typedef double Scalar;
+typedef int Integer;
 
-//Scalar example();
+namespace basisFunction
+{
+    Scalar silu(Scalar);
+}
+
+Scalar sumScalars(std::vector<Scalar> const &vector);

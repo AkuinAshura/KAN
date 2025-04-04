@@ -1,20 +1,10 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
 #include <string>
-#include <fstream>
-#include <stdexcept>
 #include <filesystem>
-#include <algorithm>
 #include <unordered_map>
-#include <memory>
 
 typedef std::unordered_map<std::string, std::string> HyperParameterList; // List of hyperparameters to be used when building the network.
-
-typedef double Scalar;
-typedef int Integer;
-typedef std::vector<Scalar> layer;
 
 namespace fs = std::filesystem;
 
@@ -33,7 +23,7 @@ public:
 
     // Getters for retrieving information about the network.
     std::string getSaveLocation() const;
-    std::vector<layer> getNetworkState() const;
+    std::vector<Layer> getNetworkState() const;
     const HyperParameterList &getHyperparameterList() const;
     const std::vector<Integer> &getLayerWidths() const;
 
@@ -42,6 +32,7 @@ public:
 
 private:
     class Network;
+    Network *net; // Pointer works because it doesn't require complete definition of network... (?)
     void retrieveAndSetDefaultHyperparameters(fs::path const &path);
     void initialiseNetwork();
     std::vector<Integer> layerWidths;

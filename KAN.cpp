@@ -1,6 +1,13 @@
 #include "kan.hpp"
 #include "network.hpp"
 
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <stdexcept>
+#include <algorithm>
+#include <memory>
+
 /* */
 KAN::KAN(fs::path const &path)
 {
@@ -175,7 +182,7 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
 
 void KAN::initialiseNetwork()
 {
-    //
+    // Set the newly created network (KAN::Network) in KAN class. Use pointer to reduce overhead.
 }
 
 const HyperParameterList &KAN::getHyperparameterList() const
