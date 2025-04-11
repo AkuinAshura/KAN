@@ -1,5 +1,5 @@
 #include "kan.hpp"
-#include "network.hpp"
+#include "network_components.hpp"
 
 #include <iostream>
 #include <vector>
@@ -7,13 +7,52 @@
 #include <stdexcept>
 #include <algorithm>
 #include <memory>
+#include <cstring>
 
 /* */
-KAN::KAN(fs::path const &path)
+KAN::KAN(fs::path const &path) : net_(std::unique_ptr<Network>(new Network()))
 {
     retrieveAndSetDefaultHyperparameters(path);
     initialiseNetwork();
 }
+
+KAN::~KAN() = default;
+
+KAN::Network::Network(std::vector<Integer> const &layerWidths, Integer bSplineBasisOrder)
+{
+    std::vector<Layer> layers;
+    Layer layer;
+    Integer prevLayerSize = 0;
+    Integer hashId = 0;
+    std::for_each(layerWidths.begin(), layerWidths.end(), [&](Integer n) {
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            // If we are at the input layer, add BaseNodes instead of Node, as there are no incoming edges associated with the input layer.
+            if (i == 0)
+            {
+                BaseNode node(hashId);
+                std::pair<BaseNode, Edge> pair(node, NULL); // There are no incoming edges associated with the input layer.
+                //layer.insert(pair);
+            }
+            else
+            {
+                Node node(prevLayerSize, hashId);
+                for (std::size_t j = 0; j < prevLayerSize * n; ++j)
+                {
+                    Edge edge(bSplineBasisOrder);
+                    std::pair<BaseNode, Edge> pair(node, edge); // Must use copy insertion because node is being reused each time.
+                    //layer.insert(pair);
+                }
+            }
+            hashId++;
+        }
+        prevLayerSize = n;
+        //layers.push_back(layer); // Add the new layer to the network being constructed. // emplace back??
+    });
+    //layers_ = layers; // Assign the network as a member variable in KAN.
+}
+
+KAN::Network::Network() {}
 
 class InvalidHyperparameterException : public std::exception
 {
@@ -27,7 +66,7 @@ public:
     std::string getValue() { return m_value; }
     virtual const char *what() const noexcept
     {
-        return "not in the list of allowed hyperparameters for this network. ";
+        return "not in the list of allowed hyperparameters for this network";
     }
 
 private:
@@ -45,7 +84,7 @@ public:
     HyperParameterList getAllowedHyperparams() { return m_allowedHyperparams; }
     virtual const char *what() const noexcept
     {
-        return "one or more hyperparameters is missing from the config file ";
+        return "one or more hyperparameters is missing from the config file";
     }
 
 private:
@@ -62,7 +101,7 @@ public:
     fs::path getPath() { return m_path; }
     virtual const char *what() const noexcept
     {
-        return "failed to open file ";
+        return "failed to open file";
     }
 
 private:
@@ -126,7 +165,7 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
             std::size_t pos = 0;
 
             HyperParameterList hyperparams;
-            auto allowedHyperparams = this->hyperparameterList;
+            auto allowedHyperparams = hyperparameterList_;
 
             while (std::getline(file, line))
             {
@@ -148,7 +187,7 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
             {
                 throw MissingHyperparameterException(allowedHyperparams);
             }
-            this->hyperparameterList = hyperparams;
+            hyperparameterList_ = hyperparams;
         }
         else
         {
@@ -157,15 +196,15 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
     }
     catch (FileException &ex)
     {
-        std::cerr << "Error: " << ex.what() << ex.getPath();
+        std::cerr << "Error: " << ex.what() << " " << ex.getPath() << "\n";
     }
     catch (InvalidHyperparameterException &ex)
     {
-        std::cerr << "Error: hyperparameter [" << ex.getHyperparam() << "] with value [" << ex.getValue() << "] " << ex.what();
+        std::cerr << "Error: hyperparameter [" << ex.getHyperparam() << "] with value [" << ex.getValue() << "] " << ex.what() << ". \n";
     }
     catch (MissingHyperparameterException &ex)
     {
-        std::cerr << "Error: " << ex.what() << "(";
+        std::cerr << "Error: " << ex.what() << " (";
         bool first = true;
         for (auto &pair : ex.getAllowedHyperparams())
         {
@@ -176,23 +215,60 @@ void KAN::retrieveAndSetDefaultHyperparameters(fs::path const &path)
             std::cerr << pair.first;
             first = false; // Done this way to prevent printing an additional comma.
         }
-        std::cerr << ")";
+        std::cerr << ")\n";
     }
+}
+
+template <typename T>
+std::vector<T> stringToVector(std::string str)
+{
+    std::string delim = ",";
+    std::size_t pos = 0;
+    std::vector<T> vec;
+    char chars[] = "()[]{}"; // Need to remove any surrounding braces/brackets.
+    try
+    {
+        for (std::size_t i = 0; i < strlen(chars); ++i)
+        {
+            str.erase(std::remove(str.begin(), str.end(), chars[i]), str.end());
+        }
+        while (str.size() != 0)
+        {
+            pos = str.find(delim);
+            std::string substr = str.substr(0, pos);
+            vec.push_back((T)std::stod(substr)); // Cast to a double (highest precision), then to type T - should handle double, float, int.
+            if (pos == std::string::npos)
+            {
+                break;
+            }
+            str.erase(0, pos + delim.length());
+        }
+    }
+    catch (...)
+    {
+        std::cerr << "There was an error converting the input string to a vector format. \n";
+    }
+    return vec;
 }
 
 void KAN::initialiseNetwork()
 {
-    // Set the newly created network (KAN::Network) in KAN class. Use pointer to reduce overhead.
+    // Set the newly created network (KAN::Network) in KAN class.
+    auto layerWidths = getLayerWidthVector();
+    Integer bSplineBasisOrder = std::stoi(hyperparameterList_.find("bSplineBasisOrder")->second);
+    Network net(layerWidths, bSplineBasisOrder);
+    *net_ = net;
 }
 
-const HyperParameterList &KAN::getHyperparameterList() const
-{
-    return this->hyperparameterList;
-}
+// const HyperParameterList &KAN::getHyperparameterList() const
+// {
+//     return this->hyperparameterList;
+// }
 
-const std::vector<Integer> &KAN::getLayerWidths() const
+const std::vector<Integer> KAN::getLayerWidthVector() const
 {
-    return this->layerWidths;
+    std::vector<Integer> layerWidths = stringToVector<Integer>(hyperparameterList_.find("layerWidths")->second);
+    return layerWidths;
 }
 
 int main(void)
@@ -203,7 +279,8 @@ int main(void)
 
     // Instantiate the network
     KAN kan = KAN(defaultHyperparameterFilePath);
-    HyperParameterList list = kan.getHyperparameterList();
+    std::cout << "success" << std::endl;
+    //HyperParameterList list = kan.getHyperparameterList();
 
     // // Report details of the constructed network.
     // std::cout << "Successfully constructed network with layers of width [";

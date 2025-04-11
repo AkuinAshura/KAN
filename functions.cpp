@@ -7,6 +7,7 @@
 Scalar silu(Scalar)
 {
     // silu function (basis function).
+    return 0;
 }
 
 Scalar sumScalars(std::vector<Scalar> const &vector)
