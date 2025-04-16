@@ -6,18 +6,19 @@
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <variant>
 
-typedef std::vector<Scalar> EdgeTerminusValues;
+// #ifndef COMPONENTS_H
+// #define COMPONENTS_H
 
 class BaseNode;
 class Edge;
-
 struct NodeHasher
 {
     template <class TNode> // Assumed that all "node" types have a hashId!!
     std::size_t operator()(TNode const &node) const
     {
-        return std::hash<TNode>()(node.hashId_);
+        return std::hash<Integer>()(node.hashId_);
     }
 };
 
@@ -30,15 +31,20 @@ struct NodeEquals
     }
 };
 
-typedef std::unordered_multimap<BaseNode, Edge, NodeHasher, NodeEquals> Layer;
+struct UniqueHashIdEnforcer
+{
+    UniqueHashIdEnforcer() = delete;
+    static Integer getNextHashId();
 
-// struct UniqueHashIdEnforcer
-// {
-//     static Integer getNextHashId() { return ++nextHashId_; }
-//     static Integer nextHashId_;
-//     UniqueHashIdEnforcer() = delete;
-// };
-//Integer UniqueHashIdEnforcer::nextHashId_ = 0;
+private:
+public:
+    static Integer nextHashId_;
+};
+
+// #endif // COMPONENTS_H
+
+typedef std::vector<Scalar> EdgeTerminusValues;
+typedef std::unordered_multimap<BaseNode, std::variant<Edge, Scalar>, NodeHasher, NodeEquals> Layer;
 
 // For input layer only (no edges needed).
 class BaseNode
@@ -46,7 +52,9 @@ class BaseNode
 
 public:
     BaseNode(Integer hashId);
-    Integer hashId_;
+    BaseNode(); // Default constructor required for passing type to equal_range.
+    const Integer hashId_;
+    Scalar output() const;
 
 protected:
     Scalar output_;
@@ -74,6 +82,7 @@ class Edge
 
 public:
     Edge(Integer bSplineBasisOrder); // Depending on the order of our B-spline basis functions, our member variable Spline will look different.
+    Scalar terminusValue() const;
 
 private:
     void computeTerminusValue();

@@ -23,33 +23,33 @@ KAN::Network::Network(std::vector<Integer> const &layerWidths, Integer bSplineBa
     std::vector<Layer> layers;
     Layer layer;
     Integer prevLayerSize = 0;
-    Integer hashId = 0;
     std::for_each(layerWidths.begin(), layerWidths.end(), [&](Integer n) {
         for (std::size_t i = 0; i < n; ++i)
         {
             // If we are at the input layer, add BaseNodes instead of Node, as there are no incoming edges associated with the input layer.
             if (i == 0)
             {
-                BaseNode node(hashId);
-                std::pair<BaseNode, Edge> pair(node, NULL); // There are no incoming edges associated with the input layer.
-                //layer.insert(pair);
+                BaseNode node(UniqueHashIdEnforcer::getNextHashId());
+                std::pair<BaseNode, Integer> pair(node, 0); // There are no incoming edges associated with the input layer.
+                layer.insert(pair);
             }
             else
             {
-                Node node(prevLayerSize, hashId);
+                Node node(prevLayerSize, UniqueHashIdEnforcer::getNextHashId());
                 for (std::size_t j = 0; j < prevLayerSize * n; ++j)
                 {
                     Edge edge(bSplineBasisOrder);
                     std::pair<BaseNode, Edge> pair(node, edge); // Must use copy insertion because node is being reused each time.
-                    //layer.insert(pair);
+                    layer.insert(pair);
                 }
             }
-            hashId++;
         }
         prevLayerSize = n;
-        //layers.push_back(layer); // Add the new layer to the network being constructed. // emplace back??
+        layers.push_back(layer); // Add the new layer to the network being constructed. // emplace back??
+        // Reset the layer object!!!
+        layer.clear();
     });
-    //layers_ = layers; // Assign the network as a member variable in KAN.
+    layers_ = layers; // Assign the network as a member variable in KAN.
 }
 
 KAN::Network::Network() {}
@@ -271,31 +271,33 @@ const std::vector<Integer> KAN::getLayerWidthVector() const
     return layerWidths;
 }
 
-int main(void)
+// Expected to be a (relatively) slow operation (?)
+const std::vector<std::pair<Scalar, std::vector<Scalar>>> KAN::Network::getNetworkValues() const
 {
-    std::cout << "Using default hyperparameters.\n";
-    fs::path defaultHyperparameterFilePath = "network_default_hyperparameters.txt";
-    //std::cout << defaultHyperparameterFilePath << std::endl;
-
-    // Instantiate the network
-    KAN kan = KAN(defaultHyperparameterFilePath);
-    std::cout << "success" << std::endl;
-    //HyperParameterList list = kan.getHyperparameterList();
-
-    // // Report details of the constructed network.
-    // std::cout << "Successfully constructed network with layers of width [";
-    // for (const auto &hyperparam : kan.getHyperparameterList())
-    // {
-    //     std::cout << hyperparam.first << ", " << hyperparam.second << "\n";
-    // }
-
-    // std::vector<Integer> &layers = kan.getLayerWidths();
-    // for (std::vector<Integer>::const_iterator i = layers.begin(); i != layers.end(); ++i)
-    // {
-    //     if (i != layers.end() - 1)
-    //         std::cout << ', ';
-    // }
-    while (1)
-        ;
-    return 0;
+    std::vector<std::pair<Scalar, EdgeTerminusValues>> vec;
+    EdgeTerminusValues edgeTerminusValues;
+    auto it = vec.begin();
+    for (Layer layer : layers_)
+    {
+        decltype(layer.equal_range(BaseNode())) range; // Pair of const iterators.
+        for (auto i = layer.begin(); i != layer.end(); i = range.second)
+        {
+            // Get the range of the current BaseNode/Node key.
+            range = layer.equal_range(i->first);
+            auto j = range.first;
+            for (; j != range.second; ++j)
+            {
+                // at j->first->hashId put j->second->
+                if (!std::holds_alternative<Edge>(j->second))
+                {
+                    // Shouldn't need error checking because it should already hold an Edge (?)
+                    //Edge edge = std::get<Edge> j;
+                    edgeTerminusValues.push_back(std::get<Edge>(j->second).terminusValue());
+                }
+            }
+            vec.insert(it + j->first.hashId_, std::pair<Scalar, std::vector<Scalar>>(j->first.output(), edgeTerminusValues));
+            vec.clear();
+        }
+    }
+    return vec;
 }

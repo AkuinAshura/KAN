@@ -1,5 +1,5 @@
 filename=kan.bin
-layerWidths=[2, 1, 1]
+layerWidths=[6, 4, 1]
 datasetLocation=Data Sets\dataset.csv
 saveLocation=C:\Users\Samuel Mason\Documents\KAN
 bSplineBasisOrder=2

@@ -1,5 +1,3 @@
-#pragma once
-
 #include "network_components.hpp"
 #include "functions.hpp"
 
@@ -7,6 +5,7 @@
 #include <vector>
 #include <filesystem>
 #include <unordered_map>
+#include <set>
 
 typedef std::unordered_map<std::string, std::string> HyperParameterList; // List of hyperparameters to be used when building the network.
 
@@ -28,7 +27,6 @@ public:
 
     // Getters for retrieving information about the network.
     std::string getSaveLocation() const;
-    //std::vector<Layer> getNetworkState() const;
     //const HyperParameterList &getHyperparameterList() const;
     const std::vector<Integer> getLayerWidthVector() const;
 
@@ -52,9 +50,12 @@ public:
     Network(std::vector<Integer> const &layerWidths, Integer bSplineBasisOrder);
     Network(); // Default constructor needed during pointer creation.
 
+    const std::vector<std::pair<Scalar, std::vector<Scalar>>> getNetworkValues() const;
+
 private:
     // Scalar &getNodeOutput(Node node) const { return node.output; }
     // Scalar &getEdgeTerminusValue(Edge edge) const { return edge.terminusValue; }
+    //const std::vector getEdgeValues() const;
 
     void setEdgeSpline();
 

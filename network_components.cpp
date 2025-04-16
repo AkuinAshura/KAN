@@ -1,10 +1,12 @@
-#include "kan.hpp"
 #include "network_components.hpp"
 #include "functions.hpp"
 
-BaseNode::BaseNode(Integer hashId) : output_(0.0){
+Integer UniqueHashIdEnforcer::nextHashId_ = 0;
+Integer UniqueHashIdEnforcer::getNextHashId() { return ++nextHashId_; }
 
-                                     };
+BaseNode::BaseNode(Integer hashId) : hashId_(hashId), output_(0.0){};
+
+BaseNode::BaseNode() : hashId_(0){};
 
 Node::Node(Integer edgeCount, Integer hashId) : BaseNode(hashId), inputs_(edgeCount){
 
@@ -30,4 +32,14 @@ void Edge::computeTerminusValue()
     // operate on originValue using the spline stored in the edge object...
     // terminusValue = basisFunction::silu() + spline op...
     // math
+}
+
+Scalar Edge::terminusValue() const
+{
+    return terminusValue_;
+}
+
+Scalar BaseNode::output() const
+{
+    return output_;
 }
